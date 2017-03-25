@@ -64,13 +64,13 @@ char* readContent(FILE *name){
  * writePipe: pipe No for write to the main process.
  */
 
-void addBatchOrder(char *fileName, int writePipe){
+void addBatchOrder(int count, Order* order, char *fileName){
 	char orderNum[10];
 	char startDate[10];
 	char dueDate[10];
 	char product[10];
 	char quantity[10];
-	char buf[80];
+	//char buf[80];
 	FILE* name;
 	name = fopen(fileName, "r");
 	if(name == NULL){
@@ -79,19 +79,17 @@ void addBatchOrder(char *fileName, int writePipe){
 	}
 	while(fscanf(name, "R%s D%s D%s Product_%s %s\n", orderNum, startDate, dueDate, product, quantity) != EOF){
 		// Indicate the start of a new order.
-		buf[0] = 'C';
-		buf[1] = 'O';
-		buf[2] = 0;
-		write(writePipe, buf, 3);
-		
-		write(writePipe, orderNum, 10);
-		write(writePipe, startDate,10);
-		write(writePipe, dueDate, 10);
-		write(writePipe, product, 10);
-		write(writePipe, quantity, 10);
+        //store in the order array
+        order[count].num = atoi(orderNum);
+        order[count].startDate = atoi(startDate);
+        order[count].dueDate = atoi(dueDate);
+        order[count].product = product[0];
+        order[count].quantity = atoi(quantity);
+        order[count].remainQty = atoi(quantity);
+        printf("%s %s %s %s %s\n", orderNum, startDate, dueDate, product, quantity);
+        count++;
+
 	}
-	buf[0] = EOF;
-	write(writePipe, buf, 2);
 	return;
 }
 
@@ -99,8 +97,22 @@ void addBatchOrder(char *fileName, int writePipe){
  * This is input module for keyboard input
  * writePipe for
  */ 
-void addOrder(int writePipe, int readPipe){
-	
+void addOrder(int count, Order* order){
+    char orderNum[10];
+    char startDate[10];
+    char dueDate[10];
+    char product[10];
+    char quantity[10];
+    scanf(" R%s D%s D%s Product_%s %s", orderNum, startDate, dueDate, product, quantity);
+    order[count].num = atoi(orderNum);
+    order[count].startDate = atoi(startDate);
+    order[count].dueDate = atoi(dueDate);
+    order[count].product = product[0];
+    order[count].quantity = atoi(quantity);
+    order[count].remainQty = atoi(quantity);
+    printf("%s %s %s %s %s\n", orderNum, startDate, dueDate, product, quantity);
+    count++;
+    return;
 }
 
 /*
@@ -169,7 +181,7 @@ int commandChoose(char* input){
  * int[product][equipment]
  */
 void inputProductInfo(char* input, int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT]){
-	FILE* in = fopen(input, "r");
+    FILE* in = fopen(input, "r");
 	int i,k;
 	for(i=0; i<10; i++){
 		for(k=0; k<10; k++){
@@ -177,7 +189,7 @@ void inputProductInfo(char* input, int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUN
 		}
 	}
 	char* result;
-	int productNum;
+	int productNum = 0;
 	while(1){
 		result = readContent(in);
 		if(result[0] == -1) break;
@@ -218,6 +230,7 @@ int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[
 	int productNum = product - 'A';
 	int i;
 	
+<<<<<<< HEAD
 	if((date+1) < startDate) return 0; 
 	// if the equipment product need is not available
 	for(i=0; i<EQUIPMENTAMOUNT; i++){
@@ -232,6 +245,7 @@ int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[
 	}
 	return 0;	
 }
+
 
 /*
  * Method for link list, delete the head and return the key;
@@ -309,10 +323,10 @@ void transResult(int line[3][60], int rejectList[MAXORDER], int rejectNum, int w
 	}
 	
 	char rejectBuf[10];
-	sprintf(rejectBuf, "%d\0", rejectNum);
+	sprintf(rejectBuf, "%d", rejectNum);
 	write(writePipe, rejectBuf, 10);
 	for(i=0; i<rejectNum; i++){
-		sprintf(rejectBuf, "%d\0", rejectList[i]);
+		sprintf(rejectBuf, "%d", rejectList[i]);
 		write(writePipe, rejectBuf, 10);
 	}
 	return;
@@ -354,6 +368,7 @@ void storeSchedule(int line[3][60], int rejectList[MAXORDER], int readPipe){
  * orderNum: the total order Num.
  * 
  */ 
+
 void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT], int writePipe){
 	int static line[3][60]; //store the order number each assembly line produce. 0 represent out of work
 	int lineState[3]; // state of a line. 0: available 1: occupied
@@ -409,7 +424,7 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 				//if finish, change line state
 				if(orderList[line[i][date]].remainQty == 0){
 					lineState[i] = 0; 
-					
+
 					//change equipmentstate
 					for(k=0; k<EQUIPMENTAMOUNT; k++){
 						int productNum = orderList[line[i][date]].product -'A';
@@ -509,3 +524,112 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 	transResult(line, rejectList, rejectNum, writePipe);
     return;
 } 
+
+int main(){
+    printf("\n\n   ~~Welcome to ALS~~\n\n");
+    Order order[MAXORDER];
+    int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT];
+    char input[] = "productcon_figuration.txt";
+    inputProductInfo(input, productInfo);
+    int count = 0;
+    while(1){
+        printf("Please enter:\n>");
+        char buffer[20];
+        scanf("%19s", buffer);
+        int command = commandChoose(buffer);
+        if(command == 1){
+            addOrder(count, order);
+        }
+        if (command == 2) {
+            char file[20];
+            scanf(" %s", file);
+            addBatchOrder(count, order, file);
+        }
+        if(command == 3){
+            char scheduler[10];
+            scanf(" %s", scheduler);
+            int pid_run;
+            
+            pid_run = fork();   //fork a process for runALS
+            
+            if ( pid_run < 0)
+            {
+                printf("Fork Failed\n");
+                exit(1);
+            }
+            
+            else if ( pid_run == 0 )
+            {
+                int pid_report, fd[2];
+                int writepipe = fd[1];
+                int readpipe = fd[0];
+                
+                if(pipe(fd) < 0){
+                    printf("Pipe pc error\n");
+                    exit(1);
+                }
+                pid_report = fork();
+                
+                if ( pid_report < 0)
+                {
+                    printf("Fork Failed\n");
+                    exit(1);
+                }
+                else if ( pid_report == 0){
+                    close(writepipe);
+                    int i,j;
+                    int line[3][60];
+                    int rejectList[MAXORDER];
+                    storeSchedule(line, rejectList, readpipe);
+                    for(i = 0; i<3; i++){
+                        for(j = 0; j < 60; j++){
+                            printf("%d", line[i][j]);
+                            printf("\n");
+                        }
+                    }
+                    close(readpipe);
+                    exit(0);
+                }
+                close(readpipe);
+                if(strcmp(scheduler, "-FCFS") == 0){
+                    FCFS(order, count, productInfo, writepipe);
+                }
+                if(strcmp(scheduler, "-EDF") == 0){
+                    //edf;
+                }
+                close(writepipe);
+                wait(NULL);
+                exit(0);
+            }
+            
+            wait(NULL);
+            exit(0);
+            
+        }
+        if (command == 4) {
+            int pid;
+            pid = fork();
+            
+            if ( pid < 0)
+            {
+                printf("Fork Failed\n");
+                exit(1);
+            }
+            
+            else if ( pid == 0 )
+            {
+                //output
+                exit(0);
+            }
+            
+            wait(NULL);
+
+        }
+        if (command == 5) {
+            break;
+        }
+    }
+    
+    return 0;
+}
+
