@@ -464,7 +464,6 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 		int productLine;
 		// accept new order
 		while(1){
-			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
 			// if the order at the beginning of the queue can't be finish, put it to the rejectlist.
 			while(!canFinish(orderList[pointer], date)){
 				rejectList[rejectNum] = orderList[pointer].num;
