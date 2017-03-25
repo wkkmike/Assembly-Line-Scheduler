@@ -63,8 +63,7 @@ char* readContent(FILE *name){
  * fileName: the name of the file contain the input.
  * writePipe: pipe No for write to the main process.
  */
-
-void addBatchOrder(int count, Order* order, char *fileName){
+int addBatchOrder(int count, Order* order, char *fileName){
 	char orderNum[10];
 	char startDate[10];
 	char dueDate[10];
@@ -90,14 +89,14 @@ void addBatchOrder(int count, Order* order, char *fileName){
         count++;
 
 	}
-	return;
+	return count;
 }
 
 /*
  * This is input module for keyboard input
  * writePipe for
  */ 
-void addOrder(int count, Order* order){
+int addOrder(int count, Order* order){
     char orderNum[10];
     char startDate[10];
     char dueDate[10];
@@ -112,7 +111,7 @@ void addOrder(int count, Order* order){
     order[count].remainQty = atoi(quantity);
     printf("%s %s %s %s %s\n", orderNum, startDate, dueDate, product, quantity);
     count++;
-    return;
+    return count;
 }
 
 /*
@@ -229,16 +228,15 @@ int cmpFCFS(const void *a, const void *b){
 int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT], char product, int startDate, int date){
 	int productNum = product - 'A';
 	int i;
-	if((date+1) < startDate) return 0; 
+	if((date+1) < startDate) return 0;
 	// if the equipment product need is not available
 	for(i=0; i<EQUIPMENTAMOUNT; i++){
 		if(equipState[i] == 1 && productInfo[productNum][i] == 1)
 			return 0;
 	}
-
 	// if productline i+1 is available
 	for(i=0; i<3; i++){
-		if(lineState == 0)
+		if(lineState[i] == 0)
 			return (i+1);
 	}
 	return 0;	
@@ -407,7 +405,7 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 				rejectNum++;
 				continue;
 			}
- 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[key].product, orderList[key].product, date); 
+ 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[key].product, orderList[key].startDate, date); 
 			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
 			else{
 				lineState[productLine-1] = 1;
@@ -484,11 +482,10 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 				rejectNum++;
 				pointer++;
 			}
- 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[pointer].product, orderList[pointer].product, date); 
+ 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[pointer].product, orderList[pointer].startDate, date); 
 			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait
-	
 			lineState[productLine-1] = 1;
-			line[productLine-1][date] = orderList[pointer].num;
+			line[productLine-1][date] = orderList[pointer].num; 
 			pointer++;
 		}
 		
@@ -507,7 +504,6 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 						if(productInfo[productNum][k] == 1) equipState[k] = 0;
 					}
 				}
-				
 				else line[i][date+1] = line[i][date]; // if not finish, do the same job next day.
 			}
 		}
@@ -519,6 +515,7 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 		rejectList[rejectNum++] = orderList[pointer].num;
 		pointer++;
 	}
+
 	transResult(line, rejectList, rejectNum, writePipe);
     return;
 } 
@@ -527,7 +524,7 @@ int main(){
     printf("\n\n   ~~Welcome to ALS~~\n\n");
     Order order[MAXORDER];
     int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT];
-    char input[] = "productcon_figuration.txt";
+    char input[] = "product_configuration.txt";
     inputProductInfo(input, productInfo);
     int count = 0;
     while(1){
@@ -536,12 +533,12 @@ int main(){
         scanf("%19s", buffer);
         int command = commandChoose(buffer);
         if(command == 1){
-            addOrder(count, order);
+            count = addOrder(count, order);
         }
         if (command == 2) {
             char file[20];
             scanf(" %s", file);
-            addBatchOrder(count, order, file);
+            count = addBatchOrder(count, order, file);
         }
         if(command == 3){
             char scheduler[10];
@@ -579,11 +576,8 @@ int main(){
                     int line[3][60];
                     int rejectList[MAXORDER];
                     storeSchedule(line, rejectList, readpipe);
-                    for(i = 0; i<3; i++){
-                        for(j = 0; j < 60; j++){
-                            printf("%d", line[i][j]);
-                            printf("\n");
-                        }
+                    for(i = 0; i<60; i++){
+                        printf("DATE:%d 1:%d 2:%d 3:%d\n", i+1, line[0][i], line[1][i], line[2][i]);
                     }
                     close(readpipe);
                     exit(0);
