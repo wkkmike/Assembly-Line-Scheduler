@@ -28,6 +28,13 @@ struct OrderList{
 };
 typedef struct OrderList OrderList;
 
+struct DueNode{
+	int key;
+	int dueDate;
+	struct Node* next;
+};
+typedef struct DueNode DueNode;
+
 /*
  * It will read a block of text from a file
  * name: the name of the file
@@ -211,7 +218,7 @@ int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[
 	int productNum = product - 'A';
 	int i;
 	
-	if(date < startDate) return 0; 
+	if((date+1) < startDate) return 0; 
 	// if the equipment product need is not available
 	for(i=0; i<EQUIPMENTAMOUNT; i++){
 		if(equipState[i] == 1 && productInfo[productNum][i] == 1)
@@ -224,6 +231,52 @@ int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[
 			return (i+1);
 	}
 	return 0;	
+}
+
+/*
+ * Method for link list, delete the head and return the key;
+ */
+int deleteHead(DueNode* head){
+	if(head == NULL) return -1;
+	int key = head.key;
+	DueNode* previous = head;
+	head = head->next;
+	free(previous);
+	return key;
+}
+
+/*
+ * Add node to a appropriate position, according to their duedate. 
+ */
+int addNodeEDF(DueNode* head, int key, int dueDate){
+	if(head == NULL){
+		head = (DueNode*) malloc(sizeof(DueNode));
+		head->key = key;
+		head->next = NULL;
+	}	
+	DueNode* current = head;
+	DueNode* previous = NULL;
+	DueNode* my = (DueNode*) malloc(sizeof(DueNode));
+	my->key = key;
+	my->dueDate = dueDate;
+	my->next = NULL;
+	if(head->dueDate > dueDate){
+		my->next = head;
+		head = my;
+		return 1;
+	}
+	
+	while(current->next != NULL){
+		if(current->dueDate > dueDate){
+			previous->next = my;
+			my->next = current;
+			return 1;
+		}
+		previous = current;
+		current = current->next;
+	}
+	current->next = my;
+	return 1;
 }
 
 /* test whether the time is sufficient to finish this job
@@ -247,9 +300,9 @@ void transResult(int line[3][60], int rejectList[MAXORDER], int rejectNum, int w
 	char cBuf[10];
 	int i;
 	for(i=0; i<60; i++){
-		sprintf(aBuf, "%d\0", line[0][i]);
-		sprintf(bBuf, "%d\0", line[1][i]);
-		sprintf(cBuf, "%d\0", line[2][i]);
+		sprintf(aBuf, "%d", line[0][i]);
+		sprintf(bBuf, "%d", line[1][i]);
+		sprintf(cBuf, "%d", line[2][i]);
 		write(writePipe, aBuf, 10);
 		write(writePipe, bBuf, 10);
 		write(writePipe, cBuf, 10);
@@ -301,6 +354,89 @@ void storeSchedule(int line[3][60], int rejectList[MAXORDER], int readPipe){
  * orderNum: the total order Num.
  * 
  */ 
+void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT], int writePipe){
+	int static line[3][60]; //store the order number each assembly line produce. 0 represent out of work
+	int lineState[3]; // state of a line. 0: available 1: occupied
+	int rejectList[MAXORDER];
+	int i, k;
+	int equipState[EQUIPMENTAMOUNT]; //state of each equipment. 0: available 1: occupied
+	int orderEDF[MAXORDER];
+	int pointer=0; 
+	int date = 0; //day counter.
+	int rejectNum = 0; // Number of reject order
+	DueNode* head=NULL; // linked list store the order available in ascending of the duedate.
+	
+	for(i=0; i<3; i++){
+		lineState[i] = 0;
+	}
+	for(i=0; i<3; i++){
+		for(k=0; k<60; k++){
+			line[i][k] = 0;
+		}
+	}
+	for(i=0; i<EQUIPMENTAMOUNT; i++){
+		equipState[i] = 0;
+	}
+	
+	qsort(orderList, orderNum, sizeof(Order), cmpFCFS); //sort the orderlist in ascending order of start date.
+	while(date < 60){
+		//add new order to EDF list
+		while(orderList[pointer].startDate <= (date+1)){
+			addNodeEDF(head, pointer, orderList[pointer].dueDate);
+			pointer++;
+		}
+			// accept new order
+		while(1){
+			int key=deleteHead(head);
+			if(!canFinish(orderList[key], date)){
+				rejectList[rejectNum] = orderList[key].num;
+				rejectNum++;
+				continue;
+			}
+ 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[key].product, orderList[key].product, date); 
+			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
+			else{
+				lineState[productLine-1] = 1;
+				line[productLine-1][date] = orderList[key].num;
+			}
+		}
+		
+		//working
+		for(i=0; i<3; i++){
+			if(lineState[i] != 0){
+				orderList[line[i][date]].remainQty -= 1000; // reduce remain amount
+				
+				//if finish, change line state
+				if(orderList[line[i][date]].remainQty == 0){
+					lineState[i] = 0; 
+					
+					//change equipmentstate
+					for(k=0; k<EQUIPMENTAMOUNT; k++){
+						int productNum = orderList[line[i][date]].product -'A';
+						if(productInfo[productNum][k] == 1) equipState[k] = 0;
+					}
+				}
+				
+				else line[i][date+1] = line[i][date]; // if not finish, do the same job next day.
+			}
+		}
+		date++;
+	}
+	
+	// put all remaining job to reject list.
+	while(head != NULL){
+		int key=deleteHead(head); 
+		rejectList[rejectNum++] = orderList[key].Num; 
+	}
+	transResult(line, rejectList, rejectNum, writePipe);
+    return;
+}
+
+/* Schedule core for FCFS
+ * orderList: a list contain the order
+ * orderNum: the total order Num.
+ * 
+ */ 
 void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT], int writePipe){
 	int static line[3][60]; //store the order number each assembly line produce. 0 represent out of work
 	int lineState[3]; // state of a line. 0: available 1: occupied
@@ -328,20 +464,19 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 		int productLine;
 		// accept new order
 		while(1){
-			while(orderList[pointer].startDate < date){
-				
-			}
- 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[pointer].product, orderList[pointer].product, date); 
 			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
-			if(!canFinish(orderList[pointer], date)){
+			// if the order at the beginning of the queue can't be finish, put it to the rejectlist.
+			while(!canFinish(orderList[pointer], date)){
 				rejectList[rejectNum] = orderList[pointer].num;
 				rejectNum++;
 				pointer++;
 			}
-			else{
-				lineState[productLine-1] = 1;
-				line[productLine-1][date] = orderList[pointer].num;
-				pointer++;
+ 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[pointer].product, orderList[pointer].product, date); 
+			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait
+	
+			lineState[productLine-1] = 1;
+			line[productLine-1][date] = orderList[pointer].num;
+			pointer++;
 			}
 		}
 		
@@ -354,7 +489,7 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 				if(orderList[line[i][date]].remainQty == 0){
 					lineState[i] = 0; 
 					
-					//change equipmentdate
+					//change equipmentstate
 					for(k=0; k<EQUIPMENTAMOUNT; k++){
 						int productNum = orderList[line[i][date]].product -'A';
 						if(productInfo[productNum][k] == 1) equipState[k] = 0;
