@@ -31,7 +31,7 @@ typedef struct OrderList OrderList;
 struct DueNode{
 	int key;
 	int dueDate;
-	struct Node* next;
+	struct DueNode* next;
 };
 typedef struct DueNode DueNode;
 
@@ -229,8 +229,6 @@ int cmpFCFS(const void *a, const void *b){
 int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT], char product, int startDate, int date){
 	int productNum = product - 'A';
 	int i;
-	
-<<<<<<< HEAD
 	if((date+1) < startDate) return 0; 
 	// if the equipment product need is not available
 	for(i=0; i<EQUIPMENTAMOUNT; i++){
@@ -252,7 +250,7 @@ int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[
  */
 int deleteHead(DueNode* head){
 	if(head == NULL) return -1;
-	int key = head.key;
+	int key = head->key;
 	DueNode* previous = head;
 	head = head->next;
 	free(previous);
@@ -380,6 +378,7 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 	int date = 0; //day counter.
 	int rejectNum = 0; // Number of reject order
 	DueNode* head=NULL; // linked list store the order available in ascending of the duedate.
+	int productLine;
 	
 	for(i=0; i<3; i++){
 		lineState[i] = 0;
@@ -399,8 +398,8 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 		while(orderList[pointer].startDate <= (date+1)){
 			addNodeEDF(head, pointer, orderList[pointer].dueDate);
 			pointer++;
-		}
-			// accept new order
+		}	
+		// accept new order
 		while(1){
 			int key=deleteHead(head);
 			if(!canFinish(orderList[key], date)){
@@ -441,7 +440,7 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 	// put all remaining job to reject list.
 	while(head != NULL){
 		int key=deleteHead(head); 
-		rejectList[rejectNum++] = orderList[key].Num; 
+		rejectList[rejectNum++] = orderList[key].num; 
 	}
 	transResult(line, rejectList, rejectNum, writePipe);
     return;
@@ -491,7 +490,6 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 			lineState[productLine-1] = 1;
 			line[productLine-1][date] = orderList[pointer].num;
 			pointer++;
-			}
 		}
 		
 		//working

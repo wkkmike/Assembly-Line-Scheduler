@@ -1,5 +1,5 @@
 Product_A Equipment_1, Equipment_4 
 Product_B Equipment_3
 Product_C Equipment_2, Equipment_5, Equipment_7 
-Product_D Equipment_24, Equipment_6, Equipment_8 
+Product_D Equipment_4, Equipment_6, Equipment_8 
 Product_E Equipment_1, Equipment_3, Equipment_6 
