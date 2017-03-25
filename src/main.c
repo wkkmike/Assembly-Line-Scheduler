@@ -28,6 +28,13 @@ struct OrderList{
 };
 typedef struct OrderList OrderList;
 
+struct DueNode{
+	int key;
+	int dueDate;
+	struct DueNode* next;
+};
+typedef struct DueNode DueNode;
+
 /*
  * It will read a block of text from a file
  * name: the name of the file
@@ -56,7 +63,6 @@ char* readContent(FILE *name){
  * fileName: the name of the file contain the input.
  * writePipe: pipe No for write to the main process.
  */
-
 void addBatchOrder(int count, Order* order, char *fileName){
 	char orderNum[10];
 	char startDate[10];
@@ -68,7 +74,7 @@ void addBatchOrder(int count, Order* order, char *fileName){
 	name = fopen(fileName, "r");
 	if(name == NULL){
 		printf("file open failed\n");
-		exit(1);
+		return;
 	}
 	while(fscanf(name, "R%s D%s D%s Product_%s %s\n", orderNum, startDate, dueDate, product, quantity) != EOF){
 		// Indicate the start of a new order.
@@ -83,14 +89,13 @@ void addBatchOrder(int count, Order* order, char *fileName){
         count++;
 
 	}
-	return;
 }
 
 /*
  * This is input module for keyboard input
  * writePipe for
  */ 
-void addOrder(int count, Order* order){
+int addOrder(int count, Order* order){
     char orderNum[10];
     char startDate[10];
     char dueDate[10];
@@ -105,7 +110,7 @@ void addOrder(int count, Order* order){
     order[count].remainQty = atoi(quantity);
     printf("%s %s %s %s %s\n", orderNum, startDate, dueDate, product, quantity);
     count++;
-    return;
+    return count;
 }
 
 /*
@@ -175,6 +180,9 @@ int commandChoose(char* input){
  */
 void inputProductInfo(char* input, int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT]){
     FILE* in = fopen(input, "r");
+    if (in == NULL) {
+        fprintf(stderr, "Couldn't open the file for reading.\n");
+    }
 	int i,k;
 	for(i=0; i<10; i++){
 		for(k=0; k<10; k++){
@@ -222,20 +230,65 @@ int cmpFCFS(const void *a, const void *b){
 int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT], char product, int startDate, int date){
 	int productNum = product - 'A';
 	int i;
-	
-	if(date < startDate) return 0; 
+	if((date+1) < startDate) return 0;
 	// if the equipment product need is not available
 	for(i=0; i<EQUIPMENTAMOUNT; i++){
 		if(equipState[i] == 1 && productInfo[productNum][i] == 1)
 			return 0;
 	}
-
 	// if productline i+1 is available
 	for(i=0; i<3; i++){
-		if(lineState == 0)
+		if(lineState[i] == 0)
 			return (i+1);
 	}
 	return 0;	
+}
+
+
+/*
+ * Method for link list, delete the head and return the key;
+ */
+int deleteHead(DueNode* head){
+	if(head == NULL) return -1;
+	int key = head->key;
+	DueNode* previous = head;
+	head = head->next;
+	free(previous);
+	return key;
+}
+
+/*
+ * Add node to a appropriate position, according to their duedate. 
+ */
+int addNodeEDF(DueNode* head, int key, int dueDate){
+	if(head == NULL){
+		head = (DueNode*) malloc(sizeof(DueNode));
+		head->key = key;
+		head->next = NULL;
+	}	
+	DueNode* current = head;
+	DueNode* previous = NULL;
+	DueNode* my = (DueNode*) malloc(sizeof(DueNode));
+	my->key = key;
+	my->dueDate = dueDate;
+	my->next = NULL;
+	if(head->dueDate > dueDate){
+		my->next = head;
+		head = my;
+		return 1;
+	}
+	
+	while(current->next != NULL){
+		if(current->dueDate > dueDate){
+			previous->next = my;
+			my->next = current;
+			return 1;
+		}
+		previous = current;
+		current = current->next;
+	}
+	current->next = my;
+	return 1;
 }
 
 /* test whether the time is sufficient to finish this job
@@ -313,6 +366,91 @@ void storeSchedule(int line[3][60], int rejectList[MAXORDER], int readPipe){
  * orderNum: the total order Num.
  * 
  */ 
+
+void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT], int writePipe){
+	int static line[3][60]; //store the order number each assembly line produce. 0 represent out of work
+	int lineState[3]; // state of a line. 0: available 1: occupied
+	int rejectList[MAXORDER];
+	int i, k;
+	int equipState[EQUIPMENTAMOUNT]; //state of each equipment. 0: available 1: occupied
+	int orderEDF[MAXORDER];
+	int pointer=0; 
+	int date = 0; //day counter.
+	int rejectNum = 0; // Number of reject order
+	DueNode* head=NULL; // linked list store the order available in ascending of the duedate.
+	int productLine;
+	
+	for(i=0; i<3; i++){
+		lineState[i] = 0;
+	}
+	for(i=0; i<3; i++){
+		for(k=0; k<60; k++){
+			line[i][k] = 0;
+		}
+	}
+	for(i=0; i<EQUIPMENTAMOUNT; i++){
+		equipState[i] = 0;
+	}
+	
+	qsort(orderList, orderNum, sizeof(Order), cmpFCFS); //sort the orderlist in ascending order of start date.
+	while(date < 60){
+		//add new order to EDF list
+		while(orderList[pointer].startDate <= (date+1)){
+			addNodeEDF(head, pointer, orderList[pointer].dueDate);
+			pointer++;
+		}	
+		// accept new order
+		while(1){
+			int key=deleteHead(head);
+			if(!canFinish(orderList[key], date)){
+				rejectList[rejectNum] = orderList[key].num;
+				rejectNum++;
+				continue;
+			}
+ 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[key].product, orderList[key].startDate, date); 
+			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
+			else{
+				lineState[productLine-1] = 1;
+				line[productLine-1][date] = orderList[key].num;
+			}
+		}
+		
+		//working
+		for(i=0; i<3; i++){
+			if(lineState[i] != 0){
+				orderList[line[i][date]].remainQty -= 1000; // reduce remain amount
+				
+				//if finish, change line state
+				if(orderList[line[i][date]].remainQty == 0){
+					lineState[i] = 0; 
+
+					//change equipmentstate
+					for(k=0; k<EQUIPMENTAMOUNT; k++){
+						int productNum = orderList[line[i][date]].product -'A';
+						if(productInfo[productNum][k] == 1) equipState[k] = 0;
+					}
+				}
+				
+				else line[i][date+1] = line[i][date]; // if not finish, do the same job next day.
+			}
+		}
+		date++;
+	}
+	
+	// put all remaining job to reject list.
+	while(head != NULL){
+		int key=deleteHead(head); 
+		rejectList[rejectNum++] = orderList[key].num; 
+	}
+	transResult(line, rejectList, rejectNum, writePipe);
+    return;
+}
+
+/* Schedule core for FCFS
+ * orderList: a list contain the order
+ * orderNum: the total order Num.
+ * 
+ */ 
 void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT], int writePipe){
 	int static line[3][60]; //store the order number each assembly line produce. 0 represent out of work
 	int lineState[3]; // state of a line. 0: available 1: occupied
@@ -340,21 +478,17 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 		int productLine;
 		// accept new order
 		while(1){
-			while(orderList[pointer].startDate < date){
-				
-			}
- 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[pointer].product, orderList[pointer].product, date); 
-			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
-			if(!canFinish(orderList[pointer], date)){
+			// if the order at the beginning of the queue can't be finish, put it to the rejectlist.
+			while(!canFinish(orderList[pointer], date)){
 				rejectList[rejectNum] = orderList[pointer].num;
 				rejectNum++;
 				pointer++;
 			}
-			else{
-				lineState[productLine-1] = 1;
-				line[productLine-1][date] = orderList[pointer].num;
-				pointer++;
-			}
+ 			productLine = qulifyIn(lineState, equipState, productInfo, orderList[pointer].product, orderList[pointer].startDate, date); 
+			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait
+			lineState[productLine-1] = 1;
+			line[productLine-1][date] = orderList[pointer].num; 
+			pointer++;
 		}
 		
 		//working
@@ -366,13 +500,12 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 				if(orderList[line[i][date]].remainQty == 0){
 					lineState[i] = 0; 
 					
-					//change equipmentdate
+					//change equipmentstate
 					for(k=0; k<EQUIPMENTAMOUNT; k++){
 						int productNum = orderList[line[i][date]].product -'A';
 						if(productInfo[productNum][k] == 1) equipState[k] = 0;
 					}
 				}
-				
 				else line[i][date+1] = line[i][date]; // if not finish, do the same job next day.
 			}
 		}
@@ -384,15 +517,16 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 		rejectList[rejectNum++] = orderList[pointer].num;
 		pointer++;
 	}
+
 	transResult(line, rejectList, rejectNum, writePipe);
     return;
-}
+} 
 
 int main(){
     printf("\n\n   ~~Welcome to ALS~~\n\n");
     Order order[MAXORDER];
     int productInfo[PRODUCTAMOUNT][EQUIPMENTAMOUNT];
-    char input[] = "productcon_figuration.txt";
+    char input[] = "product_configuration.txt";
     inputProductInfo(input, productInfo);
     int count = 0;
     while(1){
@@ -401,7 +535,7 @@ int main(){
         scanf("%19s", buffer);
         int command = commandChoose(buffer);
         if(command == 1){
-            addOrder(count, order);
+            count = addOrder(count, order);
         }
         if (command == 2) {
             char file[20];
@@ -424,13 +558,12 @@ int main(){
             else if ( pid_run == 0 )
             {
                 int pid_report, fd[2];
-                int writepipe = fd[1];
-                int readpipe = fd[0];
-                
+        
                 if(pipe(fd) < 0){
-                    printf("Pipe pc error\n");
+                    printf("Pipe error\n");
                     exit(1);
                 }
+                
                 pid_report = fork();
                 
                 if ( pid_report < 0)
@@ -439,36 +572,37 @@ int main(){
                     exit(1);
                 }
                 else if ( pid_report == 0){
-                    close(writepipe);
-                    int i,j;
+                    //printf("sp");
+                    close(fd[1]);
+                    int i;
                     int line[3][60];
                     int rejectList[MAXORDER];
-                    storeSchedule(line, rejectList, readpipe);
-                    for(i = 0; i<3; i++){
-                        for(j = 0; j < 60; j++){
-                            printf("%d", line[i][j]);
-                            printf("\n");
-                        }
+                    storeSchedule(line, rejectList, fd[0]);
+                    for(i = 0; i<60; i++){
+                        printf("DATE:%d 1:%d 2:%d 3:%d\n", i+1, line[0][i], line[1][i], line[2][i]);
                     }
-                    close(readpipe);
+                    close(fd[0]);
                     exit(0);
                 }
-                close(readpipe);
-                if(strcmp(scheduler, "-FCFS") == 0){
-                    FCFS(order, count, productInfo, writepipe);
+                else{
+                    close(fd[0]);
+                    if(strcmp(scheduler, "-FCFS") == 0){
+                        FCFS(order, count, productInfo, fd[1]);
+                    }
+                    if(strcmp(scheduler, "-EDF") == 0){
+                        EDF(order, count, productInfo, fd[1]);
+                    }
+                    
+                    wait(NULL);
+                    close(fd[1]);
+                    exit(0);
                 }
-                if(strcmp(scheduler, "-EDF") == 0){
-                    //edf;
-                }
-                close(writepipe);
-                wait(NULL);
-                exit(0);
+                
             }
             
             wait(NULL);
-            exit(0);
-            
         }
+        
         if (command == 4) {
             int pid;
             pid = fork();
@@ -495,4 +629,4 @@ int main(){
     
     return 0;
 }
- 
+
