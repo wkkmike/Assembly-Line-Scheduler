@@ -296,6 +296,7 @@ int addNodeEDF(DueNode** head, int key, int dueDate){
  */
 int canFinish(Order order, int date){
 	int requireDate = order.remainQty / 1000;
+	//printf("requireDate:%d date:%d duedate:%d \n", requireDate, date+1, order.dueDate);
 	if((order.dueDate - date) >= requireDate) return 1;
 	return 0;
 }
@@ -391,22 +392,29 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 	for(i=0; i<EQUIPMENTAMOUNT; i++){
 		equipState[i] = 0;
 	}
+	int key = -1;
 	qsort(orderList, orderNum, sizeof(Order), cmpFCFS); //sort the orderlist in ascending order of start date.
 	while(date < 60){
 		//add new order to EDF list
-		while(orderList[pointer].startDate <= (date+1)){
-			addNodeEDF(&head, pointer, orderList[pointer].dueDate);
+		while(orderList[pointer].startDate <= (date+1) && pointer < orderNum){
+			addNodeEDF(&head, pointer, orderList[pointer].dueDate); //enqueue
 			pointer++;
 		}	
 		// accept new order
 		while(1){	
-			int key=deleteHead(&head);
-			if(key == -1) break;
-			if(!canFinish(orderList[key], date)){
+			if(key == -1){ // if no key has been assigned
+				key = deleteHead(&head);
+				if(key == -1) break; //queue is empty, no new work can be assigned
+			}
+			while(!canFinish(orderList[key], date)){
+				//printf("==%d==%d==%d\n", orderList[key].num, rejectNum, key); 
 				rejectList[rejectNum] = orderList[key].num;
 				rejectNum++;
-				continue;
+				key = deleteHead(&head);
+				if(key == -1) break; // if queue is empty
 			}
+			
+			if(key == -1) break;
  			productLine = qulifyIn(lineState, equipState, productInfo, orderList[key].product, orderList[key].startDate, date);
 			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
 			else{
@@ -417,14 +425,13 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 				lineState[productLine-1] = 1;
 				line[productLine-1][date] = orderList[key].num;
 				lineP[productLine-1] = key;
+				key = deleteHead(&head); //dequeue
 			}
 		}
-
 		//working
 		for(i=0; i<3; i++){
 			if(lineState[i] != 0){
 				orderList[lineP[i]].remainQty -= 1000; // reduce remain amount
-				printf("==%d %d==\n", orderList[lineP[i]].num, orderList[lineP[i]].remainQty);
 				//if finish, change line state
 				if(orderList[lineP[i]].remainQty == 0){
 					lineState[i] = 0; 
@@ -439,7 +446,7 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 				else line[i][date+1] = line[i][date]; // if not finish, do the same job next day.
 			}
 		}
-		printf("%d date: %d %d %d\n", date+1, line[0][date], line[1][date], line[2][date]);
+		//printf("%d date: %d %d %d\n", date+1, line[0][date], line[1][date], line[2][date]);
 		date++;
 	}
 	// put all remaining job to reject list.
@@ -524,7 +531,7 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 				}
 			}
 		}
-		printf("%d date: %d %d %d\n", date+1, line[0][date], line[1][date], line[2][date]);
+		//printf("%d date: %d %d %d\n", date+1, line[0][date], line[1][date], line[2][date]);
 		date++;
 	}
 		for(i=0;i<100;i++){
@@ -587,8 +594,6 @@ int main(){
             {
                 close(fd_reject[0]);
                 int pid_report, fd[2];
-                int writepipe = fd[1];
-                int readpipe = fd[0];
                 
                 if(pipe(fd) < 0){
                     printf("Pipe pc error\n");
@@ -610,9 +615,9 @@ int main(){
                     int reject[MAXORDER];  //just store, no use.
                     storeSchedule(line, reject, fd[0]);
                     for(i = 0; i<60; i++){
-                       // printf("DATE:%d 1:%d 2:%d 3:%d\n", i+1, line[0][i], line[1][i], line[2][i]);
+                        printf("DATE:%d 1:%d 2:%d 3:%d\n", i+1, line[0][i], line[1][i], line[2][i]);
                     }
-                    close(readpipe);
+                    close(fd[0]);
                     exit(0);
                 }
                 else{
@@ -630,12 +635,6 @@ int main(){
                     close(fd_reject[1]);
                     exit(0);
                 }
-                if(strcmp(scheduler, "-EDF") == 0){
-                    EDF(order, count, productInfo, writepipe);
-                }
-                close(writepipe);
-                wait(NULL);
-                exit(0);
             }
             wait(NULL);
             close(fd_reject[1]);
