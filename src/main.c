@@ -583,7 +583,7 @@ int main(){
                 exit(1);
             }
             
-            else if ( pid_run == 0 )
+            else if ( pid_run == 0 )		//process for runALS
             {
                 close(fd_reject[0]);
                 int pid_report, fd[2];
@@ -601,9 +601,11 @@ int main(){
                     printf("Fork Failed\n");
                     exit(1);
                 }
-                else if ( pid_report == 0){
-                    close(writepipe);
-                    int i,j;
+
+                else if ( pid_report == 0){	//process for output
+                    //printf("sp");
+                    close(fd[1]);
+                    int i;
                     int line[3][60];
                     int reject[MAXORDER];  //just store, no use.
                     storeSchedule(line, reject, fd[0]);
@@ -616,8 +618,8 @@ int main(){
                 else{
                     close(fd[0]);
                     if(strcmp(scheduler, "-FCFS") == 0){
-                        FCFS(order, count, productInfo, fd[1]);
-                        FCFS(order, count, productInfo, fd_reject[1]);
+                        FCFS(order, count, productInfo, fd[1]);		//write line to output
+                        FCFS(order, count, productInfo, fd_reject[1]);  //wrire rejectlist and line to main process 
                     }
                     if(strcmp(scheduler, "-EDF") == 0){
                         EDF(order, count, productInfo, fd[1]);
@@ -637,10 +639,11 @@ int main(){
             }
             wait(NULL);
             close(fd_reject[1]);
-            storeSchedule(line, rejectList, fd_reject[0]);
+            storeSchedule(line, rejectList, fd_reject[0]);  //read from line and runALS for rejectlist.
             close(fd_reject[0]);
         }
-        if (command == 4) {
+      
+        if (command == 4) {			//printReport
             int pid;
             pid = fork();
             
