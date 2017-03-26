@@ -565,6 +565,12 @@ int main(){
             char scheduler[10];
             scanf(" %s", scheduler);
             int pid_run;
+            int fd_reject[2];
+            
+            if(pipe(fd_reject) < 0){
+                printf("Pipe error\n");
+                exit(1);
+            }
             
             pid_run = fork();   //fork a process for runALS
             
@@ -576,6 +582,7 @@ int main(){
             
             else if ( pid_run == 0 )
             {
+                close(fd_reject[0]);
                 int pid_report, fd[2];
                 int writepipe = fd[1];
                 int readpipe = fd[0];
@@ -603,9 +610,20 @@ int main(){
                     close(readpipe);
                     exit(0);
                 }
-                close(readpipe);
-                if(strcmp(scheduler, "-FCFS") == 0){
-                    FCFS(order, count, productInfo, writepipe);
+                else{
+                    close(fd[0]);
+                    if(strcmp(scheduler, "-FCFS") == 0){
+                        FCFS(order, count, productInfo, fd[1]);
+                        FCFS(order, count, productInfo, fd_reject[1]);
+                    }
+                    if(strcmp(scheduler, "-EDF") == 0){
+                        EDF(order, count, productInfo, fd[1]);
+                    }
+                    
+                    wait(NULL);
+                    close(fd[1]);
+                    close(fd_reject[1]);
+                    exit(0);
                 }
                 if(strcmp(scheduler, "-EDF") == 0){
                     EDF(order, count, productInfo, writepipe);
@@ -614,10 +632,16 @@ int main(){
                 wait(NULL);
                 exit(0);
             }
-            
             wait(NULL);
-            exit(0);
-            
+            close(fd_reject[1]);
+            int i;
+            int line[3][60];
+            int rejectList[MAXORDER];
+            storeSchedule(line, rejectList, fd_reject[0]);
+            for(i = 0; i < MAXORDER; i++){
+                printf("rejectlist: %d\n", rejectList[i]);
+            }
+            close(fd_reject[0]);
         }
         if (command == 4) {
             int pid;
