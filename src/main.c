@@ -231,8 +231,7 @@ int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[
 	if((date+1) < startDate) return 0;
 	// if the equipment product need is not available
 	for(i=0; i<EQUIPMENTAMOUNT; i++){
-		if(equipState[i] == 1 && productInfo[productNum][i] == 1)
-			return 0;
+		if(equipState[i] == 1 && productInfo[productNum][i] == 1) return 0;	
 	}
 	// if productline i+1 is available
 	for(i=0; i<3; i++){
@@ -247,7 +246,7 @@ int qulifyIn(int lineState[3], int equipState[EQUIPMENTAMOUNT], int productInfo[
  * Method for link list, delete the head and return the key;
  */
 int deleteHead(DueNode** head){
-	if(head == NULL) return -1;
+	if(*head == NULL) return -1;
 	int key = (*head)->key;
 	DueNode* previous = *head;
 	*head = (*head)->next;
@@ -400,9 +399,8 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 			pointer++;
 		}	
 		// accept new order
-		while(1){
+		while(1){	
 			int key=deleteHead(&head);
-			printf("%d  ", key);
 			if(key == -1) break;
 			if(!canFinish(orderList[key], date)){
 				rejectList[rejectNum] = orderList[key].num;
@@ -412,16 +410,21 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
  			productLine = qulifyIn(lineState, equipState, productInfo, orderList[key].product, orderList[key].startDate, date);
 			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
 			else{
+				for(i=0; i<EQUIPMENTAMOUNT; i++){
+					int productNum = orderList[pointer].product - 'A';
+					if(productInfo[productNum][i] == 1) equipState[i] = 1; 
+				}	
 				lineState[productLine-1] = 1;
 				line[productLine-1][date] = orderList[key].num;
 				lineP[productLine-1] = key;
 			}
 		}
-		
+
 		//working
 		for(i=0; i<3; i++){
 			if(lineState[i] != 0){
 				orderList[lineP[i]].remainQty -= 1000; // reduce remain amount
+				printf("==%d %d==\n", orderList[lineP[i]].num, orderList[lineP[i]].remainQty);
 				//if finish, change line state
 				if(orderList[lineP[i]].remainQty == 0){
 					lineState[i] = 0; 
@@ -492,6 +495,10 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 			if(pointer >= orderNum) break;
  			productLine = qulifyIn(lineState, equipState, productInfo, orderList[pointer].product, orderList[pointer].startDate, date); 
 			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait
+			for(i=0; i<EQUIPMENTAMOUNT; i++){
+				int productNum = orderList[pointer].product - 'A';
+				if(productInfo[productNum][i] == 1) equipState[i] = 1; 
+			}
 			lineState[productLine-1] = 1;
 			line[productLine-1][date] = orderList[pointer].num; 
 			lineP[productLine-1] = pointer;
