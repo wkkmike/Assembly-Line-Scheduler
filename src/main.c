@@ -74,7 +74,7 @@ int addBatchOrder(int count, Order* order, char *fileName){
 	name = fopen(fileName, "r");
 	if(name == NULL){
 		printf("file open failed\n");
-		exit(1);
+		return 0; 
 	}
 	while(fscanf(name, "R%s D%s D%s Product_%s %s\n", orderNum, startDate, dueDate, product, quantity) != EOF){
 		// Indicate the start of a new order.
@@ -548,6 +548,9 @@ int main(){
     char input[] = "product_configuration.txt";
     inputProductInfo(input, productInfo);
     int count = 0;
+    int i;
+    int line[3][60];
+    int rejectList[MAXORDER];
     while(1){
         printf("Please enter:\n>");
         char buffer[20];
@@ -602,8 +605,8 @@ int main(){
                     close(writepipe);
                     int i,j;
                     int line[3][60];
-                    int rejectList[MAXORDER];
-                    storeSchedule(line, rejectList, readpipe);
+                    int reject[MAXORDER];  //just store, no use.
+                    storeSchedule(line, reject, fd[0]);
                     for(i = 0; i<60; i++){
                        // printf("DATE:%d 1:%d 2:%d 3:%d\n", i+1, line[0][i], line[1][i], line[2][i]);
                     }
@@ -634,13 +637,7 @@ int main(){
             }
             wait(NULL);
             close(fd_reject[1]);
-            int i;
-            int line[3][60];
-            int rejectList[MAXORDER];
             storeSchedule(line, rejectList, fd_reject[0]);
-            for(i = 0; i < MAXORDER; i++){
-                printf("rejectlist: %d\n", rejectList[i]);
-            }
             close(fd_reject[0]);
         }
         if (command == 4) {
@@ -655,11 +652,16 @@ int main(){
             
             else if ( pid == 0 )
             {
-                //output
+                for(i = 0; i < MAXORDER; i++){
+                    if(rejectList[i] != 0){
+                      printf("rejectlist: %d\n", rejectList[i]);
+                    }
+                }
                 exit(0);
             }
             
             wait(NULL);
+            exit(0);
 
         }
         if (command == 5) {
