@@ -630,7 +630,9 @@ int main(){
             else if ( pid == 0 )
             {
                 for(i = 0; i < MAXORDER; i++){
-                    printf("rejectlist: %d\n", rejectList[i]);
+                    if(rejectList[i] != 0){
+                      printf("rejectlist: %d\n", rejectList[i]);
+                    }
                 }
                 exit(0);
             }
