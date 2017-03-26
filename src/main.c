@@ -419,7 +419,7 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 			if(productLine == 0) break; //the current order need to be product is not available now, we need to wait,
 			else{
 				for(i=0; i<EQUIPMENTAMOUNT; i++){
-					int productNum = orderList[pointer].product - 'A';
+					int productNum = orderList[key].product - 'A';
 					if(productInfo[productNum][i] == 1) equipState[i] = 1; 
 				}	
 				lineState[productLine-1] = 1;
