@@ -529,6 +529,9 @@ int main(){
     char input[] = "product_configuration.txt";
     inputProductInfo(input, productInfo);
     int count = 0;
+    int i;
+    int line[3][60];
+    int rejectList[MAXORDER];
     while(1){
         printf("Please enter:\n>");
         char buffer[20];
@@ -583,8 +586,8 @@ int main(){
                     close(fd[1]);
                     int i;
                     int line[3][60];
-                    int rejectList[MAXORDER];
-                    storeSchedule(line, rejectList, fd[0]);
+                    int reject[MAXORDER];  //just store, no use.
+                    storeSchedule(line, reject, fd[0]);
                     for(i = 0; i<60; i++){
                         printf("DATE:%d 1:%d 2:%d 3:%d\n", i+1, line[0][i], line[1][i], line[2][i]);
                     }
@@ -610,13 +613,7 @@ int main(){
             }
             wait(NULL);
             close(fd_reject[1]);
-            int i;
-            int line[3][60];
-            int rejectList[MAXORDER];
             storeSchedule(line, rejectList, fd_reject[0]);
-            for(i = 0; i < MAXORDER; i++){
-                printf("rejectlist: %d\n", rejectList[i]);
-            }
             close(fd_reject[0]);
         }
         
@@ -632,11 +629,14 @@ int main(){
             
             else if ( pid == 0 )
             {
-                //output
+                for(i = 0; i < MAXORDER; i++){
+                    printf("rejectlist: %d\n", rejectList[i]);
+                }
                 exit(0);
             }
             
             wait(NULL);
+            exit(0);
 
         }
         if (command == 5) {
