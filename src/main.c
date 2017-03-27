@@ -217,6 +217,12 @@ int cmpFCFS(const void *a, const void *b){
 	return (aa->startDate - bb->startDate);
 }
 
+int cmpOrder(const void *a, const void *b){
+    Order* aa = (Order*)a;
+    Order* bb = (Order*)b;
+    return (aa->num - bb->num);
+}
+
 /*
  * exam whether the line and the equipment is available for the production
  * lineState: current line state
@@ -555,7 +561,7 @@ int main(){
     char input[] = "product_configuration.txt";
     inputProductInfo(input, productInfo);
     int count = 0;
-    int i;
+    int i,j;
     int line[3][60];
     int rejectList[MAXORDER];
     while(1){
@@ -654,11 +660,17 @@ int main(){
             
             else if ( pid == 0 )
             {
-                for(i = 0; i < MAXORDER; i++){
-                    if(rejectList[i] != 0){
-                      printf("rejectlist: %d\n", rejectList[i]);
+                qsort(order, count, sizeof(Order), cmpOrder);
+                int c = 0;
+                for(i = 0; i < count; i++){
+                    for(j = 0; j < count; j++){
+                        if(order[j].num == rejectList[i]){
+                            printf("R%d D%d D%d Product_%c %d\n", order[j].num, order[j].startDate, order[j].dueDate, order[j].product, order[j].quantity);
+                            c++;
+                        }
                     }
                 }
+                printf("%d", c);
                 exit(0);
             }
             
