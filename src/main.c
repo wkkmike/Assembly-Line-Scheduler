@@ -390,6 +390,9 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 		lineState[i] = 0;
 		lineP[i] = 0;
 	}
+	for(i=0; i<MAXORDER; i++){
+		rejectList[i] = 0;
+	}
 	for(i=0; i<3; i++){
 		for(k=0; k<60; k++){
 			line[i][k] = 0;
@@ -480,16 +483,22 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 		lineState[i] = 0;
 		lineP[i] = 0;
 	}
+	
 	for(i=0; i<3; i++){
 		for(k=0; k<60; k++){
 			line[i][k] = 0;
 		}
 	}
+	
+	for(i=0; i<MAXORDER; i++){
+		rejectList[i] = 0;
+	}
+	
 	int equipState[EQUIPMENTAMOUNT]; //state of each equipment. 0: available 1: occupied
 	for(i=0; i<EQUIPMENTAMOUNT; i++){
 		equipState[i] = 0;
 	}
-	
+
 	qsort(orderList, orderNum, sizeof(Order), cmpFCFS); //sort the orderlist in ascending order of start date.
 	int date = 0; //day counter.
 	int rejectNum = 0; // Number of reject order
@@ -540,10 +549,7 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 		//printf("%d date: %d %d %d\n", date+1, line[0][date], line[1][date], line[2][date]);
 		date++;
 	}
-		for(i=0;i<100;i++){
-			printf("%d ", orderList[i].num);
-		}
-		printf("\n%d\n", pointer);
+	
 	// put all remaining job to reject list.
 	for(i=pointer; i<orderNum; i++){
 		rejectList[rejectNum++] = orderList[pointer].num;
