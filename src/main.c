@@ -385,7 +385,9 @@ void EDF(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT]
 	int rejectNum = 0; // Number of reject order
 	DueNode* head=NULL; // linked list store the order available in ascending of the duedate.
 	int productLine;
-	
+	for(i=0; i<MAXORDER; i++){
+		orderList[i].remainQty = orderList[i].quantity;
+	}
 	for(i=0; i<3; i++){
 		lineState[i] = 0;
 		lineP[i] = 0;
@@ -478,7 +480,10 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 	int lineState[3]; // state of a line. 0: available 1: occupied
 	int rejectList[MAXORDER];
 	int i, k;
-
+	for(i=0; i<MAXORDER; i++){
+		orderList[i].remainQty = orderList[i].quantity;
+	}
+	
 	for(i=0; i<3; i++){
 		lineState[i] = 0;
 		lineP[i] = 0;
