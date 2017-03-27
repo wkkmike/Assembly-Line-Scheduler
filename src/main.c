@@ -662,7 +662,7 @@ int main(){
             {
                 qsort(order, count, sizeof(Order), cmpOrder);
                 int c = 0;
-                for(i = 0; i < sizeof(rejectList)/sizeof(rejectList[0]); i++){
+                for(i = 0; i < count; i++){
                     for(j = 0; j < count; j++){
                         if(order[j].num == rejectList[i]){
                             printf("R%d D%d D%d Product_%c %d\n", order[j].num, order[j].startDate, order[j].dueDate, order[j].product, order[j].quantity);
