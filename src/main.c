@@ -480,6 +480,8 @@ void FCFS(Order orderList[MAXORDER], int orderNum, int productInfo[PRODUCTAMOUNT
 	int lineState[3]; // state of a line. 0: available 1: occupied
 	int rejectList[MAXORDER];
 	int i, k;
+	
+	//reset remainQty 
 	for(i=0; i<MAXORDER; i++){
 		orderList[i].remainQty = orderList[i].quantity;
 	}
